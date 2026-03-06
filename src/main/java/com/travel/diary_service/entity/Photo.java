@@ -1,0 +1,22 @@
+package com.travel.diary_service.entity;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import jakarta.persistence.*;
+import lombok.*;
+@Entity
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+public class Photo {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    @Column(nullable = false)
+    private String url;
+    @ManyToOne
+    @JoinColumn(name = "post_id")
+    @JsonIgnore
+    private DiaryPost diaryPost;
+
+}
