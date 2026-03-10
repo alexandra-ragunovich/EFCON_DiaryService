@@ -1,6 +1,8 @@
 package com.travel.diary_service.controller;
 
-import com.travel.diary_service.entity.DiaryPost;
+import com.travel.diary_service.dto.request.DiaryPostRequest;
+import com.travel.diary_service.dto.response.DiaryPostResponse;
+import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -14,24 +16,24 @@ import  java.util.List;
 public class PostController {
     private final PostService postService;
 
-    @GetMapping("/feed")
-    public List<DiaryPost> getPublicFeed(){
+    @GetMapping("/feeds")
+    public List<DiaryPostResponse> getPublicFeed(){
         return postService.getPublicFeed();
     }
     @PostMapping
-    public DiaryPost createPost(@RequestBody DiaryPost post) {
-        return postService.createPost(post);
+    public DiaryPostResponse createPost( @Valid @RequestBody DiaryPostRequest request) {
+        return postService.createPost(request);
     }
     @PatchMapping("/{postId}")
-    public DiaryPost updatePost(
+    public DiaryPostResponse updatePost(
             @PathVariable Long postId,
             @RequestParam Long userId,
-            @RequestBody DiaryPost post
+            @RequestBody DiaryPostRequest request
     ) {
-        return postService.updatePost(postId, userId, post);
+        return postService.updatePost(postId, userId, request);
     }
     @GetMapping("/users/{userId}")
-    public List<DiaryPost> getUserPosts(@PathVariable Long userId) {
+    public List<DiaryPostResponse> getUserPosts(@PathVariable Long userId) {
         return postService.getUserPosts(userId);
     }
     @DeleteMapping("/{id}")

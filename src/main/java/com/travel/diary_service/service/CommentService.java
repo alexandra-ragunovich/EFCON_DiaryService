@@ -1,7 +1,10 @@
 package com.travel.diary_service.service;
 
-import com.travel.diary_service.entity.Comment;
-import com.travel.diary_service.entity.DiaryPost;
+import com.travel.diary_service.dto.request.CommentRequest;
+import com.travel.diary_service.dto.response.CommentResponse;
+import com.travel.diary_service.entity.CommentEntity;
+import com.travel.diary_service.entity.DiaryPostEntity;
+import com.travel.diary_service.mappers.CommentMapper;
 import com.travel.diary_service.repository.CommentRepository;
 import com.travel.diary_service.repository.PostRepository;
 import jakarta.transaction.Transactional;
@@ -9,33 +12,38 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class CommentService {
     private final PostRepository postRepository;
     private final CommentRepository commentRepository;
+    private final CommentMapper commentMapper;
+
 
     @Transactional
-    public Comment addComment(Long postId, Comment comment) {
-        DiaryPost post = postRepository.findById(postId)
+    public CommentResponse addComment(Long postId, CommentRequest request) {
+        DiaryPostEntity post = postRepository.findById(postId)
                 .orElseThrow(() -> new IllegalArgumentException("Post not found"));
-        comment.setPost(post);
-        return commentRepository.save(comment);
+        CommentEntity commentEntity =commentMapper.toEntity(request);
+        commentEntity.setPost(post);
+        CommentEntity saved =commentRepository.save(commentEntity);
+        return commentMapper.toResponse(saved);
     }
 
-    public List<Comment> getCommentsByPostId(Long postId) {
+    public List<CommentResponse> getCommentsByPostId(Long postId) {
 
-        return commentRepository.findByPostIdOrderByCreatedAtAsc(postId);
+        return  commentRepository.findByPostIdOrderByCreatedAtAsc(postId).stream().map(commentMapper::toResponse).collect(Collectors.toList());
     }
     public void deleteComment(Long commentId, Long userId) {
-        Comment comment = commentRepository.findById(commentId)
+        CommentEntity commentEntity = commentRepository.findById(commentId)
                 .orElseThrow(() -> new RuntimeException("Comment not found"));
 
-        if (!comment.getUserId().equals(userId)) {
-            throw new RuntimeException("You can not delete this comment");
+        if (!commentEntity.getUserId().equals(userId)) {
+            throw new RuntimeException("You are not the owner of this comment");
         }
 
-        commentRepository.delete(comment);
+        commentRepository.delete(commentEntity);
     }
 }
