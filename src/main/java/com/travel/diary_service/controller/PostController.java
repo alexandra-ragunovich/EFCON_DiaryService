@@ -21,23 +21,35 @@ public class PostController {
         return postService.getPublicFeed();
     }
     @PostMapping
-    public DiaryPostResponse createPost( @Valid @RequestBody DiaryPostRequest request) {
+    public DiaryPostResponse createPost(
+            @RequestHeader("X-User-Id") Long userId,
+            @Valid @RequestBody DiaryPostRequest request) {
+
+        System.out.println(">>> X-User-Id = " + userId);
+        request.setUserId(userId);
         return postService.createPost(request);
     }
     @PatchMapping("/{postId}")
     public DiaryPostResponse updatePost(
             @PathVariable Long postId,
-            @RequestParam Long userId,
+            @RequestHeader("X-User-Id") Long userId,
             @RequestBody DiaryPostRequest request
     ) {
         return postService.updatePost(postId, userId, request);
     }
-    @GetMapping("/users/{userId}")
-    public List<DiaryPostResponse> getUserPosts(@PathVariable Long userId) {
+    @GetMapping("/my")
+    public List<DiaryPostResponse> getUserPosts( @RequestHeader("X-User-Id") Long userId) {
         return postService.getUserPosts(userId);
     }
+    @GetMapping("/{postId}")
+    public DiaryPostResponse getPostById(
+            @PathVariable Long postId,
+            @RequestHeader(value = "X-User-Id",required = false) Long userId
+    ) {
+        return postService.getPostById(postId, userId);
+    }
     @DeleteMapping("/{id}")
-    public void deletePost(@PathVariable Long id,@RequestParam Long userId) {
+    public void deletePost(@PathVariable Long id, @RequestHeader("X-User-Id") Long userId) {
         postService.deletePost(id,userId);
     }
 
@@ -45,8 +57,32 @@ public class PostController {
     public void deletePhoto(
             @PathVariable Long postId,
             @PathVariable Long photoId,
-            @RequestParam Long userId) {
+            @RequestHeader("X-User-Id") Long userId) {
          postService.deletePhoto(postId, photoId, userId);
+    }
+    @GetMapping("/search")
+    public List<DiaryPostResponse> searchPosts(@RequestParam("q") String keyword) {
+        return postService.searchPosts(keyword);
+    }
+
+    @PostMapping("/{postId}/bookmark")
+    public void savePostToBookmarks(
+            @PathVariable Long postId,
+            @RequestHeader("X-User-Id") Long userId) {
+        postService.savePostToBookmarks(postId, userId);
+    }
+
+    @DeleteMapping("/{postId}/bookmark")
+    public void removePostFromBookmarks(
+            @PathVariable Long postId,
+            @RequestHeader("X-User-Id") Long userId) {
+        postService.removePostFromBookmarks(postId, userId);
+    }
+
+    @GetMapping("/bookmarks")
+    public List<DiaryPostResponse> getBookmarkedPosts(
+            @RequestHeader("X-User-Id") Long userId) {
+        return postService.getBookmarkedPosts(userId);
     }
 
 }

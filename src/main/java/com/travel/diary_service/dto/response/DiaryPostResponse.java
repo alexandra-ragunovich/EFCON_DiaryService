@@ -6,7 +6,6 @@ import java.util.List;
 @Data
 public class DiaryPostResponse {
     private Long id;
-    private Long userId;
     private String title;
     private String content;
     private String location;

@@ -17,7 +17,9 @@ public class CommentController {
     private final CommentService commentService;
     @PostMapping("/{postId}/comments")
     public CommentResponse addComment(@PathVariable Long postId,
+                                      @RequestHeader("X-User-Id") Long userId,
                                       @Valid @RequestBody CommentRequest request) {
+        request.setUserId(userId);
         return commentService.addComment(postId, request);
     }
     @GetMapping("/{postId}/comments")
@@ -25,7 +27,8 @@ public class CommentController {
         return commentService.getCommentsByPostId(postId);
     }
     @DeleteMapping("/comments/{commentId}")
-    public void deleteComment( @PathVariable Long commentId, @RequestParam Long userId){
+    public void deleteComment( @PathVariable Long commentId,
+                               @RequestHeader("X-User-Id") Long userId){
          commentService.deleteComment(commentId,userId);
     }
 }

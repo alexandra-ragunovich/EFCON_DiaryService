@@ -6,7 +6,7 @@ import java.util.List;
 
 @Data
 public class DiaryPostRequest {
-    @NotNull
+
     private Long userId;
     @NotBlank
     @Size(max = 200)

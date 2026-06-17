@@ -33,7 +33,6 @@ public class DiaryPostMapper {
 
         DiaryPostResponse response = new DiaryPostResponse();
         response.setId(post.getId());
-        response.setUserId(post.getUserId());
         response.setTitle(post.getTitle());
         response.setContent(post.getContent());
         response.setLocation(post.getLocation());

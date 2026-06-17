@@ -6,7 +6,7 @@ import lombok.Data;
 
 @Data
 public class CommentRequest {
-    @NotNull
+
     private Long userId;
     @NotBlank
     private String text;

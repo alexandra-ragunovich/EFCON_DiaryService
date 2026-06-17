@@ -2,11 +2,15 @@ package com.travel.diary_service.service;
 
 import com.travel.diary_service.dto.request.DiaryPostRequest;
 import com.travel.diary_service.dto.response.DiaryPostResponse;
+import com.travel.diary_service.entity.DiaryPostDocument;
 import com.travel.diary_service.entity.DiaryPostEntity;
 import com.travel.diary_service.entity.PhotoEntity;
 import com.travel.diary_service.entity.TagEntity;
 import com.travel.diary_service.mappers.DiaryPostMapper;
+import com.travel.diary_service.repository.DiaryPostSearchRepository;
 import com.travel.diary_service.repository.PostRepository;
+import com.travel.diary_service.repository.SavedPostRepository;
+import com.travel.diary_service.entity.SavedPostEntity;
 import com.travel.diary_service.repository.TagRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -22,12 +26,17 @@ public class PostService {
     private final PostRepository postRepository;
     private final TagRepository tagRepository;
     private final DiaryPostMapper postMapper;
+    private final DiaryPostSearchRepository searchRepository;
+    private final SavedPostRepository savedPostRepository;
+
+
     @Transactional
     public DiaryPostResponse createPost(DiaryPostRequest request) {
         DiaryPostEntity post = postMapper.toEntity(request);
         addPhotos(post, request);
         addTags(post, request);
         DiaryPostEntity saved = postRepository.save(post);
+        syncToElasticsearch(saved);
         return postMapper.toResponse(saved);
     }
     public List<DiaryPostResponse> getPublicFeed() {
@@ -36,6 +45,19 @@ public class PostService {
     public List<DiaryPostResponse> getUserPosts(Long userId) {
         return postRepository.findByUserIdOrderByCreatedAtDesc(userId).stream().map(postMapper::toResponse).collect(Collectors.toList());
     }
+
+    public DiaryPostResponse getPostById(Long postId, Long userId) {
+        var post = postRepository.findById(postId)
+                .orElseThrow(() -> new RuntimeException("Post not found"));
+
+        if (!post.getPublicPost()) {
+            if (userId == null || !post.getUserId().equals(userId)) {
+                throw new RuntimeException("Forbidden: Этот пост приватный и доступен только автору");
+            }
+        }
+
+        return postMapper.toResponse(post);
+    }
     @Transactional
     public DiaryPostResponse updatePost(Long postId, Long userId, DiaryPostRequest request) {
         DiaryPostEntity post = getPostAndCheckOwnership(postId, userId);
@@ -43,11 +65,86 @@ public class PostService {
         updatePhotos(post, request);
         addTags(post, request);
         DiaryPostEntity saved = postRepository.saveAndFlush(post);
+        syncToElasticsearch(saved);
         return postMapper.toResponse(saved);
     }
     public void deletePost(Long postId, Long userId) {
         DiaryPostEntity post = getPostAndCheckOwnership(postId, userId);
         postRepository.delete(post);
+        searchRepository.deleteById(postId.toString());
+
+    }
+    public List<DiaryPostResponse> searchPosts(String keyword) {
+        if (keyword == null || keyword.isBlank()) {
+            return getPublicFeed();
+        }
+
+        List<DiaryPostDocument> searchResults = searchRepository.searchPublicPosts(keyword);
+
+        List<Long> postIds = searchResults.stream()
+                .map(doc -> Long.valueOf(doc.getId()))
+                .collect(Collectors.toList());
+
+        if (postIds.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        List<DiaryPostEntity> postsFromDb = postRepository.findAllByIdIn(postIds);
+
+        return postsFromDb.stream()
+                .map(postMapper::toResponse)
+                .collect(Collectors.toList());
+    }
+
+    private void syncToElasticsearch(DiaryPostEntity post) {
+        List<String> tagNames = new ArrayList<>();
+        if (post.getTags() != null) {
+            tagNames = post.getTags().stream().map(TagEntity::getName).collect(Collectors.toList());
+        }
+
+        DiaryPostDocument document = DiaryPostDocument.builder()
+                .id(post.getId().toString())
+                .title(post.getTitle())
+                .location(post.getLocation())
+                .tags(tagNames)
+                .publicPost(post.getPublicPost())
+                .build();
+
+        searchRepository.save(document);
+    }
+    @Transactional
+    public void savePostToBookmarks(Long postId, Long userId) {
+        DiaryPostEntity post = postRepository.findById(postId)
+                .orElseThrow(() -> new RuntimeException("Post not found"));
+
+        if (!post.getPublicPost() && !post.getUserId().equals(userId)) {
+            throw new RuntimeException("Нельзя сохранить чужой приватный пост");
+        }
+
+        if (savedPostRepository.existsByUserIdAndPostId(userId, postId)) {
+            throw new RuntimeException("Пост уже в сохраненных");
+        }
+
+        SavedPostEntity savedPost = new SavedPostEntity();
+        savedPost.setUserId(userId);
+        savedPost.setPost(post);
+        savedPostRepository.save(savedPost);
+    }
+
+    @Transactional
+    public void removePostFromBookmarks(Long postId, Long userId) {
+        SavedPostEntity savedPost = savedPostRepository.findByUserIdAndPostId(userId, postId)
+                .orElseThrow(() -> new RuntimeException("Пост не найден в закладках"));
+
+        savedPostRepository.delete(savedPost);
+    }
+
+    public List<DiaryPostResponse> getBookmarkedPosts(Long userId) {
+        List<SavedPostEntity> savedPosts = savedPostRepository.findByUserIdOrderBySavedAtDesc(userId);
+
+        return savedPosts.stream()
+                .map(saved -> postMapper.toResponse(saved.getPost()))
+                .collect(Collectors.toList());
     }
     @Transactional
     public void deletePhoto(Long postId, Long photoId, Long userId) {
